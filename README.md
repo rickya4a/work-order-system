@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Work Order Management System
 
-## Getting Started
+A manufacturing work order management system built with Next.js and PostgreSQL.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+🔐 Role-Based Access Control (RBAC)
+- Production Manager: create work orders, assign operators
+- Operator: view & update assigned work order status
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+📋 Work Order Management
+- Work order creation with automatic numbering
+- Status tracking (Pending, In Progress, Completed, Canceled)
+- Status change history
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+📊 Dashboard
+- Work order list with filters
+- Real-time status
+- Responsive interface
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tech Stack
 
-## Learn More
+- Framework: Next.js 15 (App Router)
+- Database: PostgreSQL
+- ORM: Prisma
+- Styling: Tailwind CSS
+- Authentication: JWT (jose)
+- Container: Docker & Docker Compose
 
-To learn more about Next.js, take a look at the following resources:
+## Usage
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Docker Setup:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+   ```bash
+   docker-compose up -d --build
+   docker-compose exec app sh
+   npx prisma migrate deploy
+   npx prisma db seed
+   ```
 
-## Deploy on Vercel
+2. Manual Setup:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+   ```bash
+   npm install
+   cp .env.example .env
+   npx prisma migrate dev
+   npm run seed
+   npm run dev
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+3. Open ```http://localhost:3000```
+
+## Login Credentials
+
+Production Manager:
+- Email: manager@example.com
+- Password: password123
+
+Operator:
+- Email: operator@example.com
+- Password: password123
+
+## Important Commands
+
+Database:
+- Migration: ```npx prisma migrate dev```
+- Seed: ```npm run seed```
+
+Docker:
+- Start: ```docker-compose up -d```
+- Stop: ```docker-compose down```
+- Logs: ```docker-compose logs -f app```
+- Reset DB: ```docker-compose down -v```
+
+Development:
+- Dev server: ```npm run dev```
+- Build: ```npm run build```
+- Lint: ```npm run lint```

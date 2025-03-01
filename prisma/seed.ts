@@ -24,6 +24,32 @@ async function main() {
     },
   })
 
+  // Create 10 work orders & status histories
+  for (let i = 0; i < 10; i++) {
+    const workOrder = await prisma.workOrder.create({
+      data: {
+        productName: `Product ${i + 1}`,
+        orderNumber: `WO-${i + 1}`,
+        operatorId: operator.id,
+        status: 'PENDING',
+        quantity: 100,
+        deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    })
+
+    await prisma.statusHistory.create({
+      data: {
+        workOrderId: workOrder.id,
+        status: 'PENDING',
+        createdAt: new Date(),
+        quantity: 100,
+        notes: `Notes ${i + 1}`,
+      },
+    })
+  }
+
   console.log({ manager, operator })
 }
 

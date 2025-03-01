@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { compare } from 'bcryptjs';
-import { SignJWT } from 'jose';
+import { SignJWT } from 'jose/jwt/sign';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
