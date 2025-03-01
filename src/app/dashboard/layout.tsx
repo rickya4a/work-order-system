@@ -8,7 +8,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  headers()
+  await headers()
   const user = await getSession()
 
   if (!user) {

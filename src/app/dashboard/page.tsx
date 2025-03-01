@@ -5,7 +5,7 @@ import { CreateWorkOrderButton } from '@/components/work-order/create-work-order
 import { headers } from 'next/headers'
 
 export default async function DashboardPage() {
-  headers() // Add this to force dynamic rendering
+  await headers()
   const user = await getSession()
 
   if (!user) {

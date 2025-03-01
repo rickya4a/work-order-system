@@ -20,12 +20,14 @@ export const metadata: Metadata = {
   description: "Sistem Manajemen Work Order untuk Manufaktur",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  headers()
+export default async function RootLayout(
+  {
+    children,
+  }: Readonly<{
+    children: React.ReactNode;
+  }>
+) {
+  await headers()
   return (
     <html lang="en">
       <body
