@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PRODUCTION_MANAGER
+  OPERATOR
+}
+
+enum WorkOrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELED
+}
+
+model User {
+  id        String      @id @default(cuid())
+  email     String      @unique
+  name      String
+  password  String
+  role      Role
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  workOrders WorkOrder[] @relation("AssignedOperator")
+}
+
+model WorkOrder {
+  id            String          @id @default(cuid())
+  orderNumber   String         @unique
+  productName   String
+  quantity      Int
+  deadline      DateTime
+  status        WorkOrderStatus @default(PENDING)
+  operatorId    String
+  operator      User           @relation("AssignedOperator", fields: [operatorId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  statusHistory StatusHistory[]
+}
+
+model StatusHistory {
+  id          String      @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder   @relation(fields: [workOrderId], references: [id])
+  status      WorkOrderStatus
+  quantity    Int
+  notes       String?
+  createdAt   DateTime    @default(now())
+}
