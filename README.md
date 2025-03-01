@@ -33,9 +33,6 @@ A manufacturing work order management system built with Next.js and PostgreSQL.
 
    ```bash
    docker-compose up -d --build
-   docker-compose exec app sh
-   npx prisma migrate deploy
-   npx prisma db seed
    ```
 
 2. Manual Setup:
