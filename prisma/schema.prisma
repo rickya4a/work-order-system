@@ -51,5 +51,7 @@ model StatusHistory {
   status      WorkOrderStatus
   quantity    Int
   notes       String?
+  stage       String?
   createdAt   DateTime    @default(now())
+  completedAt DateTime?
 }

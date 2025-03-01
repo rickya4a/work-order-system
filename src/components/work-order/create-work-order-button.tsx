@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Modal } from '@/components/ui/modal'
+import { workOrderEvents } from '@/lib/events'
 
 interface Operator {
   id: string
@@ -16,18 +18,16 @@ const initialFormData = {
   operatorId: '',
 }
 
-export function CreateWorkOrderButton() {
+interface CreateWorkOrderButtonProps {
+  onSuccess?: () => void
+}
+
+export function CreateWorkOrderButton({ onSuccess }: CreateWorkOrderButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [formData, setFormData] = useState(initialFormData)
   const [operators, setOperators] = useState<Operator[]>([])
-
-  useEffect(() => {
-    if (isModalOpen) {
-      fetchOperators()
-    }
-  }, [isModalOpen])
 
   async function fetchOperators() {
     try {
@@ -40,11 +40,16 @@ export function CreateWorkOrderButton() {
 
       setOperators(data)
     } catch (err) {
-      console.error('Failed to fetch operators:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load operators')
     }
   }
 
-  const handleClose = () => {
+  function handleOpen() {
+    setIsModalOpen(true)
+    fetchOperators()
+  }
+
+  function handleClose() {
     setIsModalOpen(false)
     setFormData(initialFormData)
     setError('')
@@ -71,131 +76,125 @@ export function CreateWorkOrderButton() {
       }
 
       handleClose()
-      window.location.reload()
+      workOrderEvents.emit('workOrderCreated')
+
+      if (typeof onSuccess === 'function') {
+        onSuccess()
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create work order')
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'Failed to create work order'
+      )
     } finally {
       setLoading(false)
     }
   }
 
+  const inputClassName = "w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+
   return (
     <>
-      <Button
-        onClick={() => setIsModalOpen(true)}
-        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md transition-colors"
-      >
+      <Button onClick={handleOpen}>
         Create Work Order
       </Button>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-500/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl w-full max-w-xl shadow-2xl transform transition-all">
-            <div className="border-b px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Create New Work Order</h2>
-              <button
-                onClick={handleClose}
-                className="text-gray-400 hover:text-gray-500 transition-colors"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+      <Modal
+        isOpen={isModalOpen}
+        onClose={handleClose}
+        title="Create New Work Order"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="bg-red-50 text-red-500 text-sm p-3 rounded">
+              {error}
             </div>
-            <form onSubmit={handleSubmit} className="p-6">
-              {error && (
-                <div className="mb-6 bg-red-50 text-red-500 p-4 rounded-md text-sm">
-                  {error}
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-6">
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Product Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Enter product name"
-                    className="w-full h-11 px-4 rounded-md border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-base"
-                    value={formData.productName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, productName: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Quantity
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="1"
-                    placeholder="Enter quantity"
-                    className="w-full h-11 px-4 rounded-md border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-base"
-                    value={formData.quantity}
-                    onChange={(e) =>
-                      setFormData({ ...formData, quantity: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Deadline
-                  </label>
-                  <input
-                    type="datetime-local"
-                    required
-                    className="w-full h-11 px-4 rounded-md border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-base"
-                    value={formData.deadline}
-                    onChange={(e) =>
-                      setFormData({ ...formData, deadline: e.target.value })
-                    }
-                  />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Assign Operator
-                  </label>
-                  <select
-                    required
-                    className="w-full h-11 px-4 rounded-md border border-gray-300 bg-white text-gray-900 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-base"
-                    value={formData.operatorId}
-                    onChange={(e) =>
-                      setFormData({ ...formData, operatorId: e.target.value })
-                    }
-                  >
-                    <option value="" className="text-gray-500">Select an operator</option>
-                    {operators.map((operator) => (
-                      <option key={operator.id} value={operator.id}>
-                        {operator.name} ({operator.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end space-x-3 mt-8">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleClose}
-                  className="px-6 py-2.5 text-base font-medium"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 text-base font-medium disabled:opacity-50"
-                >
-                  {loading ? 'Creating...' : 'Create Work Order'}
-                </Button>
-              </div>
-            </form>
+          )}
+
+          <div>
+            <label htmlFor="productName" className="block text-sm font-medium text-gray-700 mb-1">
+              Product Name
+            </label>
+            <input
+              type="text"
+              id="productName"
+              required
+              className={inputClassName}
+              placeholder="Enter product name"
+              value={formData.productName}
+              onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
+              Quantity
+            </label>
+            <input
+              type="number"
+              id="quantity"
+              required
+              min="1"
+              className={inputClassName}
+              placeholder="Enter quantity"
+              value={formData.quantity}
+              onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="deadline" className="block text-sm font-medium text-gray-700 mb-1">
+              Deadline
+            </label>
+            <input
+              type="datetime-local"
+              id="deadline"
+              required
+              className={inputClassName}
+              value={formData.deadline}
+              onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label htmlFor="operatorId" className="block text-sm font-medium text-gray-700 mb-1">
+              Assign Operator
+            </label>
+            <select
+              id="operatorId"
+              required
+              className={inputClassName}
+              value={formData.operatorId}
+              onChange={(e) => setFormData({ ...formData, operatorId: e.target.value })}
+            >
+              <option value="">Select an operator</option>
+              {operators.map((operator) => (
+                <option key={operator.id} value={operator.id}>
+                  {operator.name} ({operator.email})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleClose}
+              disabled={loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={loading}
+            >
+              {loading ? 'Creating...' : 'Create Work Order'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </>
   )
 }

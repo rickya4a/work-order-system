@@ -8,9 +8,9 @@ export async function PATCH(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
-  const params = await props.params
   try {
-    const workOrderId = await Promise.resolve(params.id)
+    const params = await props.params
+    const workOrderId = params.id
     const user = await requireAuth()
 
     if (user.role !== 'OPERATOR') {
@@ -20,7 +20,7 @@ export async function PATCH(
       )
     }
 
-    const { status, quantity } = await request.json()
+    const { status, quantity, stage, notes } = await request.json()
 
     const workOrder = await prisma.workOrder.findUnique({
       where: { id: workOrderId },
@@ -40,6 +40,18 @@ export async function PATCH(
       )
     }
 
+    const previousStatus = await prisma.statusHistory.findFirst({
+      where: { workOrderId },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (previousStatus?.status === status) {
+      return NextResponse.json(
+        { error: 'Status cannot be the same as the previous status' },
+        { status: 400 }
+      )
+    }
+
     const updatedWorkOrder = await prisma.workOrder.update({
       where: { id: workOrderId },
       data: {
@@ -48,6 +60,9 @@ export async function PATCH(
           create: {
             status,
             quantity: quantity || workOrder.quantity,
+            stage,
+            notes,
+            completedAt: status === 'COMPLETED' ? new Date() : null,
           },
         },
       },
@@ -57,6 +72,7 @@ export async function PATCH(
             name: true,
           },
         },
+        statusHistory: true
       },
     })
 
