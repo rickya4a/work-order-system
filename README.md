@@ -13,11 +13,6 @@ A manufacturing work order management system built with Next.js and PostgreSQL.
 - Status tracking (Pending, In Progress, Completed, Canceled)
 - Status change history
 
-📊 Dashboard
-- Work order list with filters
-- Real-time status
-- Responsive interface
-
 ## Tech Stack
 
 - Framework: Next.js 15 (App Router)
