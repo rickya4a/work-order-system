@@ -7,6 +7,7 @@ import { Modal } from '../ui/modal'
 import { workOrderEvents } from '@/lib/events'
 import { StatusHistory } from './status-history'
 import { WorkOrderStatus } from '@prisma/client'
+import { Pagination } from '@/components/ui/pagination'
 
 interface WorkOrder {
   id: string
@@ -71,6 +72,12 @@ export function WorkOrderList(
     quantity: 0
   })
   const [selectedHistory, setSelectedHistory] = useState<string | null>(null)
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 5,
+    total: 0,
+    totalPages: 0
+  })
 
   useEffect(() => {
     fetchWorkOrders()
@@ -83,7 +90,7 @@ export function WorkOrderList(
       workOrderEvents.off('workOrderCreated', fetchWorkOrders)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters])
+  }, [filters, pagination.page, pagination.limit])
 
   async function fetchWorkOrders() {
     try {
@@ -93,24 +100,27 @@ export function WorkOrderList(
         ? `/api/work-orders?operatorId=${userId}`
         : '/api/work-orders'
 
-      // Add filters to URL
+      // Add pagination params
       const params = new URLSearchParams()
+      params.append('page', pagination.page.toString())
+      params.append('limit', pagination.limit.toString())
+
+      // Add filters
       if (filters.status) params.append('status', filters.status)
       if (filters.startDate) params.append('startDate', filters.startDate)
       if (filters.endDate) params.append('endDate', filters.endDate)
 
-      if (params.toString()) {
-        url += `${url.includes('?') ? '&' : '?'}${params.toString()}`
-      }
+      url += `${url.includes('?') ? '&' : '?'}${params.toString()}`
 
       const res = await fetch(url)
-      const data = await res.json()
+      const { data, pagination: paginationData } = await res.json()
 
       if (!res.ok) {
         throw new Error(data.error)
       }
 
       setWorkOrders(data)
+      setPagination(prev => ({ ...prev, ...paginationData }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load work orders')
     } finally {
@@ -208,13 +218,27 @@ export function WorkOrderList(
 
   const inputClassName = "w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
 
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    // Simpan posisi scroll sekarang
+    const currentScroll = window.scrollY
+
+    setPagination(prev => ({ ...prev, page }))
+
+    // Kembalikan ke posisi scroll sebelumnya
+    window.scrollTo({
+      top: currentScroll,
+      behavior: 'instant' // Gunakan 'instant' agar tidak ada animasi
+    })
+  }
+
   if (loading) return <div>Loading...</div>
   if (error) return <div className="text-red-500">{error}</div>
 
   return (
-    <>
+    <div className="space-y-4">
       {userRole === 'PRODUCTION_MANAGER' && (
-        <div className="mb-4 p-4 bg-white rounded-lg shadow-sm">
+        <div className="p-4 bg-white rounded-lg shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -258,122 +282,132 @@ export function WorkOrderList(
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-lg">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Order Number
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Product
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Quantity
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Deadline
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Operator
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created At
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                History
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {workOrders.map((workOrder) => (
-              <tr key={workOrder.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {workOrder.orderNumber}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {workOrder.productName}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {workOrder.quantity}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {formatDate(new Date(workOrder.deadline))}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    workOrder.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                    workOrder.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
-                    workOrder.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {workOrder.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {workOrder.operator.name}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {formatDate(new Date(workOrder.createdAt))}
-                </td>
-                {userRole === 'OPERATOR' && (
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {workOrder.status === 'PENDING' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleStatusUpdate(workOrder.id, 'IN_PROGRESS', workOrder.quantity)}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        Start Work
-                      </Button>
-                    )}
-                    {workOrder.status === 'IN_PROGRESS' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handleStatusUpdate(workOrder.id, 'COMPLETED', workOrder.quantity)}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        Complete
-                      </Button>
-                    )}
+      <div className="flex flex-col h-[calc(100vh-250px)]">
+        <div className="flex-1 overflow-auto bg-white rounded-lg shadow">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50 border-b">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Order Number
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Product
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Quantity
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Deadline
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Operator
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Created At
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  History
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {workOrders.map((workOrder) => (
+                <tr key={workOrder.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {workOrder.orderNumber}
                   </td>
-                )}
-                {userRole === 'PRODUCTION_MANAGER' && (
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {workOrder.productName}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {workOrder.quantity}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatDate(new Date(workOrder.deadline))}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      workOrder.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                      workOrder.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' :
+                      workOrder.status === 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {workOrder.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {workOrder.operator.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {formatDate(new Date(workOrder.createdAt))}
+                  </td>
+                  {userRole === 'OPERATOR' && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {workOrder.status === 'PENDING' && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleStatusUpdate(workOrder.id, 'IN_PROGRESS', workOrder.quantity)}
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          Start Work
+                        </Button>
+                      )}
+                      {workOrder.status === 'IN_PROGRESS' && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleStatusUpdate(workOrder.id, 'COMPLETED', workOrder.quantity)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          Complete
+                        </Button>
+                      )}
+                    </td>
+                  )}
+                  {userRole === 'PRODUCTION_MANAGER' && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setEditWorkOrder({
+                            id: workOrder.id,
+                            operatorId: workOrder.operatorId,
+                            status: workOrder.status,
+                          })
+                          fetchOperators()
+                        }}
+                      >
+                        Edit
+                      </Button>
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     <Button
                       size="sm"
-                      onClick={() => {
-                        setEditWorkOrder({
-                          id: workOrder.id,
-                          operatorId: workOrder.operatorId,
-                          status: workOrder.status,
-                        })
-                        fetchOperators()
-                      }}
+                      variant="secondary"
+                      onClick={() => setSelectedHistory(workOrder.id)}
                     >
-                      Edit
+                      View History
                     </Button>
                   </td>
-                )}
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => setSelectedHistory(workOrder.id)}
-                  >
-                    View History
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="bg-white rounded-lg shadow mt-4">
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            onPageChange={handlePageChange}
+          />
+        </div>
       </div>
 
       <Modal
@@ -517,6 +551,6 @@ export function WorkOrderList(
           />
         )}
       </Modal>
-    </>
+    </div>
   )
 }

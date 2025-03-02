@@ -9,6 +9,13 @@ export async function GET(request: Request) {
   try {
     const user = await requireAuth()
     const { searchParams } = new URL(request.url)
+
+    // Pagination params
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const skip = (page - 1) * limit
+
+    // Filter params
     const operatorId = searchParams.get('operatorId')
     const status = searchParams.get('status')
     const startDate = searchParams.get('startDate')
@@ -34,8 +41,13 @@ export async function GET(request: Request) {
       if (endDate) where.createdAt.lte = new Date(endDate)
     }
 
+    // Get total count for pagination
+    const total = await prisma.workOrder.count({ where })
+
     const workOrders = await prisma.workOrder.findMany({
       where,
+      skip,
+      take: limit,
       include: {
         operator: {
           select: {
@@ -53,7 +65,15 @@ export async function GET(request: Request) {
       },
     })
 
-    return NextResponse.json(workOrders)
+    return NextResponse.json({
+      data: workOrders,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    })
   } catch (error) {
     console.error(error)
     return NextResponse.json(
