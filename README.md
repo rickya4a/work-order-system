@@ -30,6 +30,8 @@ A manufacturing work order management system built with Next.js and PostgreSQL.
    docker-compose up -d --build
    ```
 
+   Wait for the containers to start. In this stage, the database will be automatically seeded with some data.
+
 2. Manual Setup:
 
    ```bash
