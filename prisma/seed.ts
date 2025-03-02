@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client'
-import { hash } from 'bcryptjs'
-
-const prisma = new PrismaClient()
+import { PrismaClient } from '@prisma/client';
+import { hash } from 'bcryptjs';
+import { formatDateToDayjs } from '../src/lib/utils';
+const prisma = new PrismaClient();
 
 async function main() {
   // Create Production Manager
@@ -12,11 +12,11 @@ async function main() {
         email: 'manager@example.com',
         name: 'Production Manager',
         password: await hash('password123', 10),
-        role: 'PRODUCTION_MANAGER',
-      },
+        role: 'PRODUCTION_MANAGER'
+      }
     ],
-    skipDuplicates: true,
-  })
+    skipDuplicates: true
+  });
 
   // Create Operator
   const operator = await prisma.user.createManyAndReturn({
@@ -26,11 +26,11 @@ async function main() {
         email: 'operator@example.com',
         name: 'Operator 1',
         password: await hash('password123', 10),
-        role: 'OPERATOR',
-      },
+        role: 'OPERATOR'
+      }
     ],
-    skipDuplicates: true,
-  })
+    skipDuplicates: true
+  });
 
   // Create 10 work orders & status histories
   if (operator.length > 0) {
@@ -44,13 +44,15 @@ async function main() {
             operatorId: operator[0].id,
             status: 'PENDING',
             quantity: 100,
-            deadline: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7),
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          },
+            deadline: formatDateToDayjs(
+              new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
+            ).toISOString(),
+            createdAt: formatDateToDayjs(new Date()).toISOString(),
+            updatedAt: formatDateToDayjs(new Date()).toISOString()
+          }
         ],
-        skipDuplicates: true,
-      })
+        skipDuplicates: true
+      });
 
       await prisma.statusHistory.createManyAndReturn({
         select: { id: true },
@@ -58,24 +60,24 @@ async function main() {
           {
             workOrderId: workOrder[0].id,
             status: 'PENDING',
-            createdAt: new Date(),
+            createdAt: formatDateToDayjs(new Date()).toISOString(),
             quantity: 100,
-            notes: `Notes ${i + 1}`,
-          },
+            notes: `Notes ${i + 1}`
+          }
         ],
-        skipDuplicates: true,
-      })
+        skipDuplicates: true
+      });
     }
   }
 
-  console.log({ manager, operator })
+  console.log({ manager, operator });
 }
 
 main()
   .catch((e) => {
-    console.error(e)
-    process.exit(1)
+    console.error(e);
+    process.exit(1);
   })
   .finally(async () => {
-    await prisma.$disconnect()
-  })
+    await prisma.$disconnect();
+  });

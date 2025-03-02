@@ -1,22 +1,38 @@
 import { ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import dayjs from 'dayjs'
+import timezone from 'dayjs/plugin/timezone'
+import utc from 'dayjs/plugin/utc'
+import customParseFormat from 'dayjs/plugin/customParseFormat'
+
+// Extend dayjs with plugins
+dayjs.extend(utc)
+dayjs.extend(timezone)
+dayjs.extend(customParseFormat)
+
+// Set default timezone
+dayjs.tz.setDefault('Asia/Jakarta')
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatDate(date: Date) {
-  return new Intl.DateTimeFormat('id-ID', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(date)
+export function formatDate(date: Date | string) {
+  return dayjs(date)
+    .tz('Asia/Jakarta')
+    .format('YYYY-MM-DD HH:mm')
+}
+
+export function formatDateToDayjs(date: Date | string) {
+  return dayjs(date)
+    .tz('Asia/Jakarta')
 }
 
 export function generateWorkOrderNumber() {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const date = dayjs().tz('Asia/Jakarta')
+  const year = date.year()
+  const month = date.format('MM')
+  const day = date.format('DD')
   const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
 
   return `WO-${year}${month}${day}-${random}`

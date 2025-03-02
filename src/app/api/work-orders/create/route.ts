@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
-import { generateWorkOrderNumber } from '@/lib/utils'
+import { generateWorkOrderNumber, formatDate } from '@/lib/utils'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -14,28 +14,16 @@ export async function POST(request: Request) {
       )
     }
 
-    const { productName, quantity, deadline, operatorId } = await request.json()
+    const data = await request.json()
+    const orderNumber = generateWorkOrderNumber()
 
     const workOrder = await prisma.workOrder.create({
       data: {
-        orderNumber: generateWorkOrderNumber(),
-        productName,
-        quantity: parseInt(quantity),
-        deadline: new Date(deadline),
-        operatorId,
-        statusHistory: {
-          create: {
-            status: 'PENDING',
-            quantity: parseInt(quantity),
-          },
-        },
-      },
-      include: {
-        operator: {
-          select: {
-            name: true,
-          },
-        },
+        ...data,
+        orderNumber,
+        status: 'PENDING',
+        createdAt: formatDate(new Date()),
+        updatedAt: formatDate(new Date()),
       },
     })
 

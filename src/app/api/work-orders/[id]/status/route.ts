@@ -3,66 +3,67 @@ export const runtime = 'nodejs'
 import { prisma } from '@/lib/prisma'
 import { requireAuth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
+import { WorkOrderStatus } from '@prisma/client'
 
 export async function PATCH(
   request: Request,
   props: { params: Promise<{ id: string }> }
 ) {
   try {
-    const params = await props.params
-    const workOrderId = params.id
     const user = await requireAuth()
+    const { id } = await props.params
+    const workOrderId = id
+    const { status, stage, quantity, notes } = await request.json()
 
-    if (user.role !== 'OPERATOR') {
+    // Validate quantity
+    if (typeof quantity !== 'number' || quantity < 0) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
-    }
-
-    const { status, quantity, stage, notes } = await request.json()
-
-    const workOrder = await prisma.workOrder.findUnique({
-      where: { id: workOrderId },
-    })
-
-    if (!workOrder) {
-      return NextResponse.json(
-        { error: 'Work order not found' },
-        { status: 404 }
-      )
-    }
-
-    if (workOrder.operatorId !== user.id) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 403 }
-      )
-    }
-
-    const previousStatus = await prisma.statusHistory.findFirst({
-      where: { workOrderId },
-      orderBy: { createdAt: 'desc' }
-    })
-
-    if (previousStatus?.status === status) {
-      return NextResponse.json(
-        { error: 'Status cannot be the same as the previous status' },
+        { error: 'Invalid quantity' },
         { status: 400 }
       )
+    }
+
+    // For operators, validate status transitions
+    if (user.role === 'OPERATOR') {
+      const workOrder = await prisma.workOrder.findUnique({
+        where: { id: workOrderId },
+      })
+
+      if (!workOrder) {
+        return NextResponse.json(
+          { error: 'Work order not found' },
+          { status: 404 }
+        )
+      }
+
+      // Only allow specific transitions
+      const allowedTransitions = {
+        PENDING: ['IN_PROGRESS'],
+        IN_PROGRESS: ['COMPLETED'],
+      }
+
+      if (
+        !allowedTransitions[workOrder.status as keyof typeof allowedTransitions]?.includes(status) ||
+        workOrder.operatorId !== user.id
+      ) {
+        return NextResponse.json(
+          { error: 'Invalid status transition' },
+          { status: 400 }
+        )
+      }
     }
 
     const updatedWorkOrder = await prisma.workOrder.update({
       where: { id: workOrderId },
       data: {
-        status,
+        status: status as WorkOrderStatus,
+        updatedAt: new Date(),
         statusHistory: {
           create: {
-            status,
-            quantity: quantity || workOrder.quantity,
+            status: status as WorkOrderStatus,
+            quantity,
             stage,
             notes,
-            completedAt: status === 'COMPLETED' ? new Date() : null,
           },
         },
       },
@@ -72,7 +73,6 @@ export async function PATCH(
             name: true,
           },
         },
-        statusHistory: true
       },
     })
 

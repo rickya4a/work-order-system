@@ -16,15 +16,49 @@ interface WorkOrder {
   operator: {
     name: string
   }
+  operatorId: string
+  createdAt: string
 }
 
-export function WorkOrderList({ userRole, userId }: { userRole: string; userId: string }) {
+interface Filters {
+  status?: string
+  startDate?: string
+  endDate?: string
+}
+
+interface StatusUpdateForm {
+  stage?: string
+  quantity: number
+}
+
+export function WorkOrderList(
+  {
+    userRole,
+    userId,
+  }: {
+    userRole: string
+    userId: string
+  }
+) {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedWorkOrder, setSelectedWorkOrder] = useState<{ id: string; status: string } | null>(null)
-  const [stage, setStage] = useState('')
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState<{
+    id: string
+    status: string
+  } | null>(null)
+  const [filters, setFilters] = useState<Filters>({})
+  const [operators, setOperators] = useState<{ id: string; name: string }[]>([])
+  const [editWorkOrder, setEditWorkOrder] = useState<{
+    id: string;
+    operatorId: string;
+    status: string;
+  } | null>(null)
+  const [statusForm, setStatusForm] = useState<StatusUpdateForm>({
+    stage: '',
+    quantity: 0
+  })
 
   useEffect(() => {
     fetchWorkOrders()
@@ -37,13 +71,23 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
       workOrderEvents.off('workOrderCreated', fetchWorkOrders)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [filters])
 
   async function fetchWorkOrders() {
     try {
-      const url = userRole === 'OPERATOR'
+      let url = userRole === 'OPERATOR'
         ? `/api/work-orders?operatorId=${userId}`
         : '/api/work-orders'
+
+      // Add filters to URL
+      const params = new URLSearchParams()
+      if (filters.status) params.append('status', filters.status)
+      if (filters.startDate) params.append('startDate', filters.startDate)
+      if (filters.endDate) params.append('endDate', filters.endDate)
+
+      if (params.toString()) {
+        url += `${url.includes('?') ? '&' : '?'}${params.toString()}`
+      }
 
       const res = await fetch(url)
       const data = await res.json()
@@ -60,8 +104,16 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
     }
   }
 
-  async function handleStatusUpdate(workOrderId: string, newStatus: string) {
+  async function handleStatusUpdate(workOrderId: string, newStatus: string, currentQuantity: number) {
+    setStatusForm(prev => ({ ...prev, quantity: currentQuantity }))
+
     if (newStatus === 'IN_PROGRESS') {
+      setSelectedWorkOrder({ id: workOrderId, status: newStatus })
+      setIsModalOpen(true)
+      return
+    }
+
+    if (newStatus === 'COMPLETED') {
       setSelectedWorkOrder({ id: workOrderId, status: newStatus })
       setIsModalOpen(true)
       return
@@ -70,7 +122,7 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
     await updateWorkOrderStatus(workOrderId, newStatus)
   }
 
-  async function updateWorkOrderStatus(workOrderId: string, newStatus: string, stageValue?: string) {
+  async function updateWorkOrderStatus(workOrderId: string, newStatus: string) {
     try {
       const res = await fetch(`/api/work-orders/${workOrderId}/status`, {
         method: 'PATCH',
@@ -79,8 +131,9 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
         },
         body: JSON.stringify({
           status: newStatus,
-          stage: stageValue,
-          notes: `Status diubah ke ${newStatus}${stageValue ? ` - ${stageValue}` : ''}`
+          stage: statusForm.stage,
+          quantity: statusForm.quantity,
+          notes: `Status diubah ke ${newStatus}${statusForm.stage ? ` - ${statusForm.stage}` : ''} (Quantity: ${statusForm.quantity})`
         }),
       })
 
@@ -96,12 +149,42 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
     }
   }
 
-  function handleSubmitStage() {
-    if (selectedWorkOrder && stage.trim()) {
-      updateWorkOrderStatus(selectedWorkOrder.id, selectedWorkOrder.status, stage)
-      setIsModalOpen(false)
-      setSelectedWorkOrder(null)
-      setStage('')
+
+  // Fetch operators for reassignment
+  async function fetchOperators() {
+    try {
+      const res = await fetch('/api/operators')
+      const data = await res.json()
+      setOperators(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load operators')
+    }
+  }
+
+  // Add this function
+  async function handleEditWorkOrder(workOrderId: string, newStatus: string, newOperatorId: string) {
+    try {
+      const res = await fetch(`/api/work-orders/${workOrderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          operatorId: newOperatorId,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        throw new Error(data.error)
+      }
+
+      await fetchWorkOrders()
+      setEditWorkOrder(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update work order')
     }
   }
 
@@ -112,6 +195,59 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
 
   return (
     <>
+      {userRole === 'PRODUCTION_MANAGER' && (
+        <div className="mb-4 p-4 bg-white rounded-lg shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
+              <select
+                className={inputClassName}
+                value={filters.status || ''}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, status: e.target.value }))
+                  fetchWorkOrders()
+                }}
+              >
+                <option value="">All Status</option>
+                <option value="PENDING">Pending</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELED">Canceled</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Start Date
+              </label>
+              <input
+                type="date"
+                className={inputClassName}
+                value={filters.startDate || ''}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, startDate: e.target.value }))
+                  fetchWorkOrders()
+                }}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                End Date
+              </label>
+              <input
+                type="date"
+                className={inputClassName}
+                value={filters.endDate || ''}
+                onChange={(e) => {
+                  setFilters(prev => ({ ...prev, endDate: e.target.value }))
+                  fetchWorkOrders()
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="overflow-x-auto rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">
@@ -135,7 +271,15 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Operator
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Created At
+              </th>
               {userRole === 'OPERATOR' && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              )}
+              {userRole === 'PRODUCTION_MANAGER' && (
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -170,12 +314,15 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {workOrder.operator.name}
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {formatDate(new Date(workOrder.createdAt))}
+                </td>
                 {userRole === 'OPERATOR' && (
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {workOrder.status === 'PENDING' && (
                       <Button
                         size="sm"
-                        onClick={() => handleStatusUpdate(workOrder.id, 'IN_PROGRESS')}
+                        onClick={() => handleStatusUpdate(workOrder.id, 'IN_PROGRESS', workOrder.quantity)}
                         className="bg-blue-600 hover:bg-blue-700"
                       >
                         Start Work
@@ -184,12 +331,29 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
                     {workOrder.status === 'IN_PROGRESS' && (
                       <Button
                         size="sm"
-                        onClick={() => handleStatusUpdate(workOrder.id, 'COMPLETED')}
+                        onClick={() => handleStatusUpdate(workOrder.id, 'COMPLETED', workOrder.quantity)}
                         className="bg-green-600 hover:bg-green-700"
                       >
                         Complete
                       </Button>
                     )}
+                  </td>
+                )}
+                {userRole === 'PRODUCTION_MANAGER' && (
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setEditWorkOrder({
+                          id: workOrder.id,
+                          operatorId: workOrder.operatorId,
+                          status: workOrder.status,
+                        })
+                        fetchOperators()
+                      }}
+                    >
+                      Edit
+                    </Button>
                   </td>
                 )}
               </tr>
@@ -203,40 +367,126 @@ export function WorkOrderList({ userRole, userId }: { userRole: string; userId: 
         onClose={() => {
           setIsModalOpen(false)
           setSelectedWorkOrder(null)
-          setStage('')
+          setStatusForm({ stage: '', quantity: 0 })
         }}
-        title="Enter Production Stage"
+        title={selectedWorkOrder?.status === 'IN_PROGRESS' ? 'Start Production' : 'Complete Production'}
       >
         <div className="space-y-4">
+          {selectedWorkOrder?.status === 'IN_PROGRESS' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Stage
+              </label>
+              <input
+                type="text"
+                value={statusForm.stage || ''}
+                onChange={(e) => setStatusForm(prev => ({ ...prev, stage: e.target.value }))}
+                className={inputClassName}
+                placeholder="Ex: Cutting, Assembly, etc"
+              />
+            </div>
+          )}
+
           <div>
-            <label htmlFor="stage" className="block text-sm font-medium text-gray-700 mb-1">
-              Stage
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Quantity
             </label>
             <input
-              type="text"
-              id="stage"
-              value={stage}
-              onChange={(e) => setStage(e.target.value)}
+              type="number"
+              min="0"
+              value={statusForm.quantity}
+              onChange={(e) => setStatusForm(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
               className={inputClassName}
-              placeholder="Ex: Cutting, Assembly, etc"
+              placeholder="Enter quantity"
             />
           </div>
+
           <div className="flex justify-end space-x-3">
             <Button
               variant="secondary"
               onClick={() => {
                 setIsModalOpen(false)
                 setSelectedWorkOrder(null)
-                setStage('')
+                setStatusForm({ stage: '', quantity: 0 })
               }}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleSubmitStage}
-              disabled={!stage.trim()}
+              onClick={() => {
+                if (selectedWorkOrder) {
+                  updateWorkOrderStatus(selectedWorkOrder.id, selectedWorkOrder.status)
+                  setIsModalOpen(false)
+                  setSelectedWorkOrder(null)
+                  setStatusForm({ stage: '', quantity: 0 })
+                }
+              }}
+              disabled={!statusForm.quantity || (selectedWorkOrder?.status === 'IN_PROGRESS' && !statusForm.stage)}
             >
               Save
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!editWorkOrder}
+        onClose={() => setEditWorkOrder(null)}
+        title="Edit Work Order"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              className={inputClassName}
+              value={editWorkOrder?.status || ''}
+              onChange={(e) => setEditWorkOrder(prev => prev ? { ...prev, status: e.target.value } : null)}
+            >
+              <option value="PENDING">Pending</option>
+              <option value="IN_PROGRESS">In Progress</option>
+              <option value="COMPLETED">Completed</option>
+              <option value="CANCELED">Canceled</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reassign Operator
+            </label>
+            <select
+              className={inputClassName}
+              value={editWorkOrder?.operatorId || ''}
+              onChange={(e) => setEditWorkOrder(prev => prev ? { ...prev, operatorId: e.target.value } : null)}
+            >
+              {operators.map((op) => (
+                <option key={op.id} value={op.id}>
+                  {op.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <Button
+              variant="secondary"
+              onClick={() => setEditWorkOrder(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (editWorkOrder) {
+                  handleEditWorkOrder(
+                    editWorkOrder.id,
+                    editWorkOrder.status,
+                    editWorkOrder.operatorId
+                  )
+                }
+              }}
+            >
+              Save Changes
             </Button>
           </div>
         </div>
