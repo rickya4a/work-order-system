@@ -42,6 +42,11 @@ export async function GET(request: Request) {
             name: true,
           },
         },
+        statusHistory: {
+          orderBy: {
+            createdAt: 'desc'
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc',

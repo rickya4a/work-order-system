@@ -37,3 +37,14 @@ export function generateWorkOrderNumber() {
 
   return `WO-${year}${month}${day}-${random}`
 }
+
+export function formatDuration(start: Date, end: Date) {
+  const diff = end.getTime() - start.getTime()
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`
+  }
+  return `${minutes}m`
+}

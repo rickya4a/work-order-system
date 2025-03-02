@@ -5,6 +5,8 @@ import { formatDate } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Modal } from '../ui/modal'
 import { workOrderEvents } from '@/lib/events'
+import { StatusHistory } from './status-history'
+import { WorkOrderStatus } from '@prisma/client'
 
 interface WorkOrder {
   id: string
@@ -12,12 +14,21 @@ interface WorkOrder {
   productName: string
   quantity: number
   deadline: string
-  status: string
+  status: WorkOrderStatus
   operator: {
     name: string
   }
   operatorId: string
   createdAt: string
+  statusHistory: {
+    id: string
+    status: WorkOrderStatus
+    stage?: string
+    quantity: number
+    notes?: string
+    createdAt: string
+    completedAt?: string
+  }[]
 }
 
 interface Filters {
@@ -59,6 +70,7 @@ export function WorkOrderList(
     stage: '',
     quantity: 0
   })
+  const [selectedHistory, setSelectedHistory] = useState<string | null>(null)
 
   useEffect(() => {
     fetchWorkOrders()
@@ -75,6 +87,8 @@ export function WorkOrderList(
 
   async function fetchWorkOrders() {
     try {
+      setLoading(true)
+
       let url = userRole === 'OPERATOR'
         ? `/api/work-orders?operatorId=${userId}`
         : '/api/work-orders'
@@ -104,7 +118,11 @@ export function WorkOrderList(
     }
   }
 
-  async function handleStatusUpdate(workOrderId: string, newStatus: string, currentQuantity: number) {
+  async function handleStatusUpdate(
+    workOrderId: string,
+    newStatus: string,
+    currentQuantity: number
+  ) {
     setStatusForm(prev => ({ ...prev, quantity: currentQuantity }))
 
     if (newStatus === 'IN_PROGRESS') {
@@ -205,10 +223,7 @@ export function WorkOrderList(
               <select
                 className={inputClassName}
                 value={filters.status || ''}
-                onChange={(e) => {
-                  setFilters(prev => ({ ...prev, status: e.target.value }))
-                  fetchWorkOrders()
-                }}
+                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
               >
                 <option value="">All Status</option>
                 <option value="PENDING">Pending</option>
@@ -225,10 +240,7 @@ export function WorkOrderList(
                 type="date"
                 className={inputClassName}
                 value={filters.startDate || ''}
-                onChange={(e) => {
-                  setFilters(prev => ({ ...prev, startDate: e.target.value }))
-                  fetchWorkOrders()
-                }}
+                onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
               />
             </div>
             <div>
@@ -239,10 +251,7 @@ export function WorkOrderList(
                 type="date"
                 className={inputClassName}
                 value={filters.endDate || ''}
-                onChange={(e) => {
-                  setFilters(prev => ({ ...prev, endDate: e.target.value }))
-                  fetchWorkOrders()
-                }}
+                onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
               />
             </div>
           </div>
@@ -274,16 +283,12 @@ export function WorkOrderList(
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Created At
               </th>
-              {userRole === 'OPERATOR' && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              )}
-              {userRole === 'PRODUCTION_MANAGER' && (
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              )}
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actions
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                History
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -356,6 +361,15 @@ export function WorkOrderList(
                     </Button>
                   </td>
                 )}
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setSelectedHistory(workOrder.id)}
+                  >
+                    View History
+                  </Button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -490,6 +504,18 @@ export function WorkOrderList(
             </Button>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={!!selectedHistory}
+        onClose={() => setSelectedHistory(null)}
+        title="Work Order History"
+      >
+        {selectedHistory && (
+          <StatusHistory
+            history={workOrders.find(wo => wo.id === selectedHistory)?.statusHistory || []}
+          />
+        )}
       </Modal>
     </>
   )

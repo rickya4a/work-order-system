@@ -5,9 +5,10 @@ import { WorkOrderStatus } from '@prisma/client'
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await props.params
     const user = await requireAuth()
 
     if (user.role !== 'PRODUCTION_MANAGER') {
@@ -17,7 +18,7 @@ export async function PATCH(
       )
     }
 
-    const workOrderId = params.id
+    const workOrderId = id
     const { status, operatorId } = await request.json()
 
     const workOrder = await prisma.workOrder.findUnique({

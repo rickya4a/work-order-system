@@ -45,13 +45,13 @@ model WorkOrder {
 }
 
 model StatusHistory {
-  id          String      @id @default(cuid())
+  id          String          @id @default(cuid())
+  workOrder   WorkOrder       @relation(fields: [workOrderId], references: [id])
   workOrderId String
-  workOrder   WorkOrder   @relation(fields: [workOrderId], references: [id])
   status      WorkOrderStatus
+  stage       String?
   quantity    Int
   notes       String?
-  stage       String?
-  createdAt   DateTime    @default(now())
+  createdAt   DateTime        @default(now())
   completedAt DateTime?
 }

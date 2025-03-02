@@ -1,6 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { hash } from 'bcryptjs';
-import { formatDateToDayjs } from '../src/lib/utils';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.tz.setDefault('Asia/Jakarta');
+
 const prisma = new PrismaClient();
 
 async function main() {
@@ -44,11 +51,11 @@ async function main() {
             operatorId: operator[0].id,
             status: 'PENDING',
             quantity: 100,
-            deadline: formatDateToDayjs(
-              new Date(Date.now() + 1000 * 60 * 60 * 24 * 7)
-            ).toISOString(),
-            createdAt: formatDateToDayjs(new Date()).toISOString(),
-            updatedAt: formatDateToDayjs(new Date()).toISOString()
+            deadline: dayjs(new Date(Date.now() + 1000 * 60 * 60 * 24 * 7))
+              .tz('Asia/Jakarta')
+              .toISOString(),
+            createdAt: dayjs(new Date()).tz('Asia/Jakarta').toISOString(),
+            updatedAt: dayjs(new Date()).tz('Asia/Jakarta').toISOString()
           }
         ],
         skipDuplicates: true
@@ -60,7 +67,7 @@ async function main() {
           {
             workOrderId: workOrder[0].id,
             status: 'PENDING',
-            createdAt: formatDateToDayjs(new Date()).toISOString(),
+            createdAt: dayjs(new Date()).tz('Asia/Jakarta').toISOString(),
             quantity: 100,
             notes: `Notes ${i + 1}`
           }

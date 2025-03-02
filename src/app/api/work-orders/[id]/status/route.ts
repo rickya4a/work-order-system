@@ -15,6 +15,22 @@ export async function PATCH(
     const workOrderId = id
     const { status, stage, quantity, notes } = await request.json()
 
+    // Get previous status history
+    const previousStatus = await prisma.statusHistory.findFirst({
+      where: { workOrderId },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    // Calculate time spent on previous status
+    if (previousStatus && !previousStatus.completedAt) {
+      await prisma.statusHistory.update({
+        where: { id: previousStatus.id },
+        data: {
+          completedAt: new Date()
+        }
+      })
+    }
+
     // Validate quantity
     if (typeof quantity !== 'number' || quantity < 0) {
       return NextResponse.json(
@@ -53,6 +69,7 @@ export async function PATCH(
       }
     }
 
+    // Create new status history
     const updatedWorkOrder = await prisma.workOrder.update({
       where: { id: workOrderId },
       data: {
@@ -64,6 +81,9 @@ export async function PATCH(
             quantity,
             stage,
             notes,
+            createdAt: new Date(),
+            // Set completedAt only if status is COMPLETED
+            completedAt: status === 'COMPLETED' ? new Date() : null
           },
         },
       },
@@ -73,6 +93,10 @@ export async function PATCH(
             name: true,
           },
         },
+        statusHistory: {
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        }
       },
     })
 
